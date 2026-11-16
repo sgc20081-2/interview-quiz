@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Тренажер к собеседованию</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; max-width: 700px; margin: 0 auto; padding: 20px; background: #f4f6f8; color: #1f2937; }
+    .card { background: #fff; padding: 24px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 16px; }
+    h1, h2, h3 { margin-top: 0; }
+    button { display: block; width: 100%; text-align: left; padding: 12px 16px; margin: 8px 0; border: 1px solid #d1d5db; border-radius: 8px; background: #fff; font-size: 16px; cursor: pointer; transition: 0.15s; }
+    button:hover:not(:disabled) { background: #f3f4f6; border-color: #9ca3af; }
+    button.correct { background: #dcfce7; border-color: #22c55e; color: #14532d; font-weight: 600; }
+    button.wrong { background: #fee2e2; border-color: #ef4444; color: #7f1d1d; }
+    .btn-primary { background: #2563eb; color: #fff; border: none; text-align: center; font-weight: 600; }
+    .btn-primary:hover { background: #1d4ed8; }
+    .explanation { margin-top: 16px; padding: 14px; background: #eff6ff; border-left: 4px solid #3b82f6; border-radius: 6px; }
+    .hidden { display: none; }
+    .meta { color: #6b7280; font-size: 14px; margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+
+  <div id="menu-screen" class="card">
+    <h1>Подготовка к собеседованию</h1>
+    <div id="categories-list">Загрузка тем...</div>
+  </div>
+
+  <div id="quiz-screen" class="card hidden">
+    <div class="meta" id="progress-text"></div>
+    <h2 id="question-text"></h2>
+    <div id="options-list"></div>
+    <div id="explanation-box" class="explanation hidden"></div>
+    <button id="next-btn" class="btn-primary hidden" style="margin-top: 16px;">Дальше →</button>
+    <button id="back-btn" style="margin-top: 8px; text-align: center;">В меню</button>
+  </div>
+
+  <div id="result-screen" class="card hidden">
+    <h2>Тест завершен!</h2>
+    <p id="score-text" style="font-size: 18px;"></p>
+    <button id="restart-btn" class="btn-primary">В главное меню</button>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

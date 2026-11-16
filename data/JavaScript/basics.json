@@ -1,0 +1,30 @@
+{
+  "category": "JavaScript",
+  "subcategory": "Основы и типы данных",
+  "questions": [
+    {
+      "id": "js-01",
+      "question": "Что вернет выражение typeof null?",
+      "options": [
+        "null",
+        "object",
+        "undefined",
+        "boolean"
+      ],
+      "correctIndex": 1,
+      "explanation": "Это известная историческая ошибка в JavaScript, которая сохранена для обратной совместимости."
+    },
+    {
+      "id": "js-02",
+      "question": "Какой метод массива создает новый массив, отфильтровывая элементы?",
+      "options": [
+        "forEach()",
+        "map()",
+        "filter()",
+        "reduce()"
+      ],
+      "correctIndex": 2,
+      "explanation": "Метод filter() возвращает новый массив со всеми элементами, прошедшими проверку в переданной функции."
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+name: Build Manifest and Deploy to Pages
+
+on:
+  push:
+    branches: ["main"]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Скачиваем код
+        uses: actions/checkout@v4
+
+      - name: Генерируем manifest.json
+        run: python3 build_manifest.py
+
+      - name: Настраиваем GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Загружаем файлы сайта
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+
+      - name: Публикуем на GitHub Pages
+        uses: actions/deploy-pages@v4
