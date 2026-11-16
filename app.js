@@ -1,7 +1,10 @@
 const QUESTIONS_LIMIT = 20;
+const HISTORY_KEY = 'quiz_recent_history';
+
 let currentQuestions = [];
 let currentIndex = 0;
 let score = 0;
+let currentTestTitle = '';
 
 const menuScreen = document.getElementById('menu-screen');
 const quizScreen = document.getElementById('quiz-screen');
@@ -19,8 +22,9 @@ function shuffle(array) {
 
 // Загрузка меню из манифеста
 async function initMenu() {
+  renderHistory();
   try {
-    const res = await fetch('data/manifest.json');
+    const res = await fetch(`data/manifest.json?t=${Date.now()}`);
     const data = await res.json();
     const container = document.getElementById('categories-list');
     container.innerHTML = '';
@@ -34,7 +38,7 @@ async function initMenu() {
       cat.subcategories.forEach(sub => {
         const btn = document.createElement('button');
         btn.textContent = `${sub.title} (${sub.count} вопр.)`;
-        btn.onclick = () => startQuiz(sub.file);
+        btn.onclick = () => startQuiz(sub.file, `${cat.title}: ${sub.title}`);
         container.appendChild(btn);
       });
     });
@@ -43,10 +47,69 @@ async function initMenu() {
   }
 }
 
+// Сохранение результата в localStorage
+function saveResult(title, score, total) {
+  const history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }) +
+                  ' ' + now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+
+  history.unshift({
+    title,
+    score,
+    total,
+    date: dateStr
+  });
+
+  // Храним только 10 последних результатов
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(0, 10)));
+}
+
+// Отрисовка колонки недавних тестов
+function renderHistory() {
+  const history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+  const container = document.getElementById('history-list');
+  const clearBtn = document.getElementById('clear-history-btn');
+
+  if (history.length === 0) {
+    container.innerHTML = '<div class="meta">Пока нет пройденных тестов</div>';
+    clearBtn.classList.add('hidden');
+    return;
+  }
+
+  clearBtn.classList.remove('hidden');
+  container.innerHTML = '';
+
+  history.forEach(item => {
+    const percent = Math.round((item.score / item.total) * 100);
+    let badgeClass = 'badge-bad';
+    if (percent >= 80) badgeClass = 'badge-good';
+    else if (percent >= 50) badgeClass = 'badge-mid';
+
+    const div = document.createElement('div');
+    div.className = 'history-item';
+    div.innerHTML = `
+      <div class="history-title">${item.title}</div>
+      <div class="history-meta">
+        <span>${item.date}</span>
+        <span class="badge ${badgeClass}">${item.score} / ${item.total} (${percent}%)</span>
+      </div>
+    `;
+    container.appendChild(div);
+  });
+}
+
+document.getElementById('clear-history-btn').onclick = () => {
+  localStorage.removeItem(HISTORY_KEY);
+  renderHistory();
+};
+
 // Старт теста
-async function startQuiz(filePath) {
+async function startQuiz(filePath, testTitle) {
   const res = await fetch(filePath);
   const data = await res.json();
+
+  currentTestTitle = testTitle || `${data.category}: ${data.subcategory}`;
 
   // Берем 20 случайных вопросов и перемешиваем варианты ответов внутри каждого
   currentQuestions = shuffle(data.questions)
@@ -121,6 +184,7 @@ document.getElementById('next-btn').onclick = () => {
   if (currentIndex < currentQuestions.length) {
     renderQuestion();
   } else {
+    saveResult(currentTestTitle, score, currentQuestions.length);
     quizScreen.classList.add('hidden');
     resultScreen.classList.remove('hidden');
     document.getElementById('score-text').textContent = `Правильных ответов: ${score} из ${currentQuestions.length}`;
@@ -128,6 +192,7 @@ document.getElementById('next-btn').onclick = () => {
 };
 
 const goHome = () => {
+  renderHistory();
   quizScreen.classList.add('hidden');
   resultScreen.classList.add('hidden');
   menuScreen.classList.remove('hidden');
