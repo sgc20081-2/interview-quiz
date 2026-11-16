@@ -1,5 +1,6 @@
 const QUESTIONS_LIMIT = 20;
 const HISTORY_KEY = 'quiz_recent_history';
+const GIST_CONFIG_KEY = 'quiz_gist_config';
 
 let currentQuestions = [];
 let currentIndex = 0;
@@ -20,9 +21,119 @@ function shuffle(array) {
   return arr;
 }
 
-// Загрузка меню из манифеста
+// --- БЛОК СИНХРОНИЗАЦИИ С GITHUB GIST ---
+
+function getGistConfig() {
+  return JSON.parse(localStorage.getItem(GIST_CONFIG_KEY) || 'null');
+}
+
+function setSyncStatus(text, isError = false) {
+  const el = document.getElementById('sync-status');
+  el.textContent = text;
+  el.style.color = isError ? '#dc2626' : '#6b7280';
+}
+
+// Загрузка истории из Gist
+async function pullHistoryFromGist() {
+  const cfg = getGistConfig();
+  if (!cfg || !cfg.gistId || !cfg.token) {
+    setSyncStatus('Локальный режим (без облака)');
+    return;
+  }
+
+  setSyncStatus('Синхронизация...');
+  try {
+    const res = await fetch(`https://github.com{cfg.gistId}?t=${Date.now()}`, {
+      headers: {
+        'Authorization': `Bearer ${cfg.token}`,
+        'Accept': 'application/vnd.github+json'
+      }
+    });
+
+    if (!res.ok) throw new Error(`Ошибка HTTP ${res.status}`);
+
+    const data = await res.json();
+    const fileContent = data.files['history.json']?.content;
+
+    if (fileContent) {
+      const remoteHistory = JSON.parse(fileContent);
+      if (Array.isArray(remoteHistory)) {
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(remoteHistory));
+        renderHistory();
+      }
+    }
+    setSyncStatus('☁️ Синхронизировано с GitHub');
+  } catch (e) {
+    setSyncStatus('⚠️ Ошибка загрузки из Gist', true);
+    console.error(e);
+  }
+}
+
+// Отправка истории в Gist
+async function pushHistoryToGist(historyArray) {
+  const cfg = getGistConfig();
+  if (!cfg || !cfg.gistId || !cfg.token) return;
+
+  setSyncStatus('Сохранение в облако...');
+  try {
+    const res = await fetch(`https://github.com{cfg.gistId}`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${cfg.token}`,
+        'Accept': 'application/vnd.github+json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        files: {
+          'history.json': {
+            content: JSON.stringify(historyArray, null, 2)
+          }
+        }
+      })
+    });
+
+    if (!res.ok) throw new Error(`Ошибка HTTP ${res.status}`);
+    setSyncStatus('☁️ Сохранено в GitHub');
+  } catch (e) {
+    setSyncStatus('⚠️ Не удалось сохранить в Gist', true);
+    console.error(e);
+  }
+}
+
+// Управление формой настроек синхронизации
+document.getElementById('toggle-sync-btn').onclick = () => {
+  const box = document.getElementById('sync-settings');
+  box.classList.toggle('hidden');
+
+  const cfg = getGistConfig();
+  if (cfg) {
+    document.getElementById('gist-id-input').value = cfg.gistId || '';
+    document.getElementById('gist-token-input').value = cfg.token || '';
+  }
+};
+
+document.getElementById('save-sync-btn').onclick = async () => {
+  const gistId = document.getElementById('gist-id-input').value.trim();
+  const token = document.getElementById('gist-token-input').value.trim();
+
+  if (!gistId || !token) {
+    localStorage.removeItem(GIST_CONFIG_KEY);
+    setSyncStatus('Локальный режим (настройки очищены)');
+    document.getElementById('sync-settings').classList.add('hidden');
+    return;
+  }
+
+  localStorage.setItem(GIST_CONFIG_KEY, JSON.stringify({ gistId, token }));
+  document.getElementById('sync-settings').classList.add('hidden');
+  await pullHistoryFromGist();
+};
+
+// --- ОСНОВНАЯ ЛОГИКА ПРИЛОЖЕНИЯ ---
+
 async function initMenu() {
   renderHistory();
+  pullHistoryFromGist(); // Фоново подтягиваем актуальные данные из облака
+
   try {
     const res = await fetch(`data/manifest.json?t=${Date.now()}`);
     const data = await res.json();
@@ -47,8 +158,7 @@ async function initMenu() {
   }
 }
 
-// Сохранение результата в localStorage
-function saveResult(title, score, total) {
+async function saveResult(title, score, total) {
   const history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
   const now = new Date();
   const dateStr = now.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }) +
@@ -61,11 +171,11 @@ function saveResult(title, score, total) {
     date: dateStr
   });
 
-  // Храним только 10 последних результатов
-  localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(0, 10)));
+  const trimmedHistory = history.slice(0, 15);
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(trimmedHistory));
+  await pushHistoryToGist(trimmedHistory);
 }
 
-// Отрисовка колонки недавних тестов
 function renderHistory() {
   const history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
   const container = document.getElementById('history-list');
@@ -99,19 +209,18 @@ function renderHistory() {
   });
 }
 
-document.getElementById('clear-history-btn').onclick = () => {
+document.getElementById('clear-history-btn').onclick = async () => {
   localStorage.removeItem(HISTORY_KEY);
   renderHistory();
+  await pushHistoryToGist([]);
 };
 
-// Старт теста
 async function startQuiz(filePath, testTitle) {
   const res = await fetch(filePath);
   const data = await res.json();
 
   currentTestTitle = testTitle || `${data.category}: ${data.subcategory}`;
 
-  // Берем 20 случайных вопросов и перемешиваем варианты ответов внутри каждого
   currentQuestions = shuffle(data.questions)
     .slice(0, QUESTIONS_LIMIT)
     .map(q => {
@@ -133,7 +242,6 @@ async function startQuiz(filePath, testTitle) {
   renderQuestion();
 }
 
-// Отрисовка вопроса
 function renderQuestion() {
   const q = currentQuestions[currentIndex];
   document.getElementById('progress-text').textContent = `Вопрос ${currentIndex + 1} из ${currentQuestions.length}`;
@@ -154,7 +262,6 @@ function renderQuestion() {
   });
 }
 
-// Проверка ответа
 function handleAnswer(selectedIndex, selectedBtn) {
   const q = currentQuestions[currentIndex];
   const buttons = document.getElementById('options-list').querySelectorAll('button');
