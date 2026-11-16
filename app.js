@@ -43,7 +43,7 @@ async function pullHistoryFromGist() {
 
   setSyncStatus('Синхронизация...');
   try {
-    const res = await fetch(`https://github.com{cfg.gistId}?t=${Date.now()}`, {
+    const res = await fetch(`https://api.github.com/gists/${cfg.gistId}?t=${Date.now()}`, {
       headers: {
         'Authorization': `Bearer ${cfg.token}`,
         'Accept': 'application/vnd.github+json'
@@ -76,7 +76,7 @@ async function pushHistoryToGist(historyArray) {
 
   setSyncStatus('Сохранение в облако...');
   try {
-    const res = await fetch(`https://github.com{cfg.gistId}`, {
+    const res = await fetch(`https://api.github.com/gists/${cfg.gistId}`, {
       method: 'PATCH',
       headers: {
         'Authorization': `Bearer ${cfg.token}`,
